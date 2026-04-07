@@ -6,6 +6,7 @@ public class User {
     private String nume;
     private String email;
     private String parola;
+    private double balanta;
     private List<Comanda> comenzi;
     private List<Recenzie> recenzii;
     private List<Tranzactie> tranzactii;
@@ -15,6 +16,7 @@ public class User {
         this.nume = nume;
         this.email = email;
         this.parola = parola;
+        this.balanta = 0.0;
         this.comenzi = new ArrayList<>();
         this.recenzii = new ArrayList<>();
         this.tranzactii = new ArrayList<>();
@@ -24,6 +26,7 @@ public class User {
     public String getNume() { return nume; }
     public String getEmail() { return email; }
     public String getParola() { return parola; }
+    public double getBalanta() { return balanta; }
     public List<Comanda> getComenzi() { return comenzi; }
     public List<Recenzie> getRecenzii() { return recenzii; }
     public List<Tranzactie> getTranzactii() { return tranzactii; }
@@ -32,6 +35,7 @@ public class User {
     public void setNume(String nume) { this.nume = nume; }
     public void setEmail(String email) { this.email = email; }
     public void setParola(String parola) { this.parola = parola; }
+    public void setBalanta(double balanta) { this.balanta = balanta; }
 
     public void addTranzactie(Tranzactie tranzactie) { this.tranzactii.add(tranzactie); }
     public void addComanda(Comanda comanda) { this.comenzi.add(comanda); }

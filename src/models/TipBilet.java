@@ -1,3 +1,5 @@
+package models;
+
 public enum TipBilet {
     STANDARD,
     VIP,

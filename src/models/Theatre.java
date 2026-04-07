@@ -1,3 +1,4 @@
+package models;
 public class Theatre extends Eveniment {
     private String piesa;
     private String regizor;

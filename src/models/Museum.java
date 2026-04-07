@@ -1,3 +1,4 @@
+package models;
 public class Museum extends Eveniment{
     private String nume_muzeu;
     private String tip_expozitie;

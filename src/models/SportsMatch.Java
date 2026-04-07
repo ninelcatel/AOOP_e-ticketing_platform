@@ -1,3 +1,4 @@
+package models;
 public class SportsMatch extends Eveniment {
     private String echipa_gazda;
     private String echipa_oaspete;

@@ -1,3 +1,5 @@
+package models;
+
 public class Bilet {
     private int id;
     private Eveniment eveniment;

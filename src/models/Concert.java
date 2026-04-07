@@ -1,3 +1,4 @@
+package models;
 public class Concert extends Eveniment {
     private String artist;
     private String gen_muzical;

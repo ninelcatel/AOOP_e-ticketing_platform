@@ -1,3 +1,4 @@
+package models;
 import java.util.List;
 
 public class Locatie{
@@ -29,4 +30,14 @@ public class Locatie{
     public void setAdresa(String adresa) { this.adresa = adresa; }
     public void setCountry(String country) { this.country = country; }
     public void setCapacitate(int capacitate) { this.capacitate = capacitate < 0 ? 0 : capacitate; }
+    
+    public boolean addEveniment(Eveniment eveniment) {
+        if (eveniment == null) {
+            return false;
+        }
+        if (!this.evenimente.contains(eveniment)) {
+            this.evenimente.add(eveniment);
+        }
+        return true;
+    }
 }

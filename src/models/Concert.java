@@ -1,0 +1,3 @@
+class Concert extends Eveniment{
+    
+}

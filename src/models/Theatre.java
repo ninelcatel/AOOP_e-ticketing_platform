@@ -1,0 +1,3 @@
+class Theatre extends Eveniment{
+    
+}

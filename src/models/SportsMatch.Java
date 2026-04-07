@@ -1,0 +1,3 @@
+class SportsMatch extends Eveniment{
+    
+}

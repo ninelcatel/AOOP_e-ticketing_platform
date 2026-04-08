@@ -19,4 +19,9 @@ public class Concert extends Eveniment {
     public String getTipEveniment() {
         return "CONCERT";
     }
+
+    @Override
+    public String getDetaliiSpecifice() {
+        return "Artist: " + artist + " - Gen: " + gen_muzical;
+    }
 }

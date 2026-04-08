@@ -86,7 +86,7 @@ public class main {
         console.printf("Email: ");
         String email = citireLinie();
 
-        if (service.findUserByEmail(email) != null) {
+        if (service.isEmailDejaFolosit(email)) {
             console.printf("Exista deja un cont cu acest email.\n");
             return;
         }
@@ -114,7 +114,6 @@ public class main {
         console.printf("5. Gestionare Recenzii\n");
         console.printf("6. Rapoarte si Statistici\n");
         console.printf("9. Logout\n");
-        console.printf("0. Iesire\n");
         console.printf("Alegeti optiune: ");
 
         int optiune = citireInt();
@@ -140,29 +139,27 @@ public class main {
             case 9:
                 logout();
                 return true;
-            case 0:
-                console.printf("La revedere!\n");
-                return false;
             default:
                 console.printf("Optiune invalida!\n");
                 return true;
         }
     }
 
-    // meniul userului loat
+    // meniul userului 
     private static boolean meniuUser() {
         console.printf("\n========== MENIU USER ==========\n");
-        console.printf("User: %s | Balanta: %.2f lei\n", currentUser.getNume(), currentUser.getBalanta());
+        console.printf("User: %s - Balanta: %.2f lei\n", currentUser.getNume(), currentUser.getBalanta());
         console.printf("1. Afiseaza toate evenimentele\n");
         console.printf("2. Cauta eveniment dupa nume\n");
-        console.printf("3. Filtreaza evenimente dupa tip\n");
-        console.printf("4. Filtreaza evenimente dupa tara\n");
-        console.printf("5. Cumpara bilet\n");
-        console.printf("6. Transfer bilet\n");
-        console.printf("7. Refund bilet\n");
+        console.printf("3. Filtreaza evenimente dupa tara\n");
+        console.printf("4. Cumpara bilet\n");
+        console.printf("5. Transfer bilet\n");
+        console.printf("6. Refund bilet\n");
+        console.printf("7. Export bilet in TXT\n");
         console.printf("8. Top up balance\n");
-        console.printf("9. Raport recenzii eveniment\n");
-        console.printf("10. Detaliile contului meu\n");
+        console.printf("9. Adauga recenzie\n");
+        console.printf("10. Raport recenzii eveniment\n");
+        console.printf("11. Detaliile contului meu\n");
         console.printf("0. Logout\n");
         console.printf("Alegeti optiune: ");
 
@@ -175,27 +172,30 @@ public class main {
                 cautaEvenimentConsola();
                 return true;
             case 3:
-                filtreazaDupaTip();
-                return true;
-            case 4:
                 filtreazaDupaTara();
                 return true;
-            case 5:
+            case 4:
                 cumparaBiletConsola();
                 return true;
-            case 6:
+            case 5:
                 transferBiletConsola();
                 return true;
-            case 7:
+            case 6:
                 refundBiletConsola();
+                return true;
+            case 7:
+                exportBiletConsola();
                 return true;
             case 8:
                 topUpConsola();
                 return true;
             case 9:
-                raportRecenziiEvenimentConsola();
+                adaugaRecenzieUserConsola();
                 return true;
             case 10:
+                raportRecenziiEvenimentConsola();
+                return true;
+            case 11:
                 service.showUser(currentUser.getId());
                 console.printf("Balanta: %.2f lei\n", currentUser.getBalanta());
                 return true;
@@ -217,9 +217,8 @@ public class main {
             console.printf("2. Sterge eveniment\n");
             console.printf("3. Modifica eveniment\n");
             console.printf("4. Cauta eveniment dupa nume\n");
-            console.printf("5. Filtreaza dupa tip\n");
-            console.printf("6. Filtreaza dupa tara\n");
-            console.printf("7. Afiseaza toate evenimentele\n");
+            console.printf("5. Filtreaza dupa tara\n");
+            console.printf("6. Afiseaza toate evenimentele\n");
             console.printf("0. Inapoi\n");
             console.printf("Alegeti optiune: ");
             
@@ -239,12 +238,9 @@ public class main {
                     cautaEvenimentConsola();
                     break;
                 case 5:
-                    filtreazaDupaTip();
-                    break;
-                case 6:
                     filtreazaDupaTara();
                     break;
-                case 7:
+                case 6:
                     service.showAllEvenimente();
                     break;
                 case 0:
@@ -376,44 +372,6 @@ public class main {
         }
     }
 
-    private static void filtreazaDupaTip() {
-        console.printf("Tipuri disponibile:\n");
-        console.printf("1. CONCERT\n");
-        console.printf("2. SPORTS_MATCH\n");
-        console.printf("3. THEATRE\n");
-        console.printf("4. MUSEUM\n");
-        console.printf("Alegeti tipul: ");
-        int opt = citireInt();
-
-        String tip;
-        switch (opt) {
-            case 1:
-                tip = "CONCERT";
-                break;
-            case 2:
-                tip = "SPORTS_MATCH";
-                break;
-            case 3:
-                tip = "THEATRE";
-                break;
-            case 4:
-                tip = "MUSEUM";
-                break;
-            default:
-                console.printf("Tip invalid!\n");
-                return;
-        }
-
-        var rezultate = service.filtreazaEvenimenteDupaTip(tip);
-        if (rezultate.isEmpty()) {
-            console.printf("Niciun eveniment de acest tip!\n");
-        } else {
-            console.printf("\n--- Rezultate ---\n");
-            for (Eveniment e : rezultate) {
-                console.printf("%d. %s (%s)\n", e.getId(), e.getNume(), e.getTipEveniment());
-            }
-        }
-    }
 
     private static void filtreazaDupaTara() {
         console.printf("Introduceti tara: ");
@@ -471,7 +429,7 @@ public class main {
         console.printf("Email: ");
         String email = citireLinie();
 
-        if (service.findUserByEmail(email) != null) {
+        if (service.isEmailDejaFolosit(email)) {
             console.printf("Exista deja un user cu acest email!\n");
             return;
         }
@@ -484,12 +442,12 @@ public class main {
         console.printf("Utilizator adaugat cu succes!\n");
     }
 
-    // ===== MENIU BILETE (ADMIN) =====
     private static void meniuBileteAdmin() {
         boolean back = false;
         while (!back) {
             console.printf("\n========== MENIU BILETE (ADMIN) ==========\n");
             console.printf("1. Afiseaza bilet dupa ID\n");
+            console.printf("2. Afiseaza toate biletele\n");
             console.printf("0. Inapoi\n");
             console.printf("Alegeti optiune: ");
 
@@ -498,6 +456,9 @@ public class main {
                 case 1:
                     console.printf("ID bilet: ");
                     service.showBilet(citireInt());
+                    break;
+                case 2:
+                    service.showAllBilete();
                     break;
                 case 0:
                     back = true;
@@ -542,7 +503,7 @@ public class main {
         }
 
         double suma = bilet.getComanda() != null && bilet.getComanda().getTranzactie() != null ? bilet.getComanda().getTranzactie().getSuma() : 0;
-        console.printf("Bilet cumparat cu succes! ID bilet=%d | Total=%.2f lei\n", bilet.getId(), suma);
+        console.printf("Bilet cumparat cu succes! ID bilet=%d - Total=%.2f lei\n", bilet.getId(), suma);
     }
 
     private static void transferBiletConsola() {
@@ -745,35 +706,16 @@ public class main {
         }
     }
 
-    // ===== MENIU RAPOARTE =====
     private static void meniuRapoarte() {
         boolean back = false;
         while (!back) {
             console.printf("\n========== MENIU RAPOARTE ==========\n");
-            console.printf("1. Vanzari per eveniment\n");
-            console.printf("2. Vanzari per locatie (ID locatie)\n");
-            console.printf("3. Total bilete vandute\n");
             console.printf("0. Inapoi\n");
             console.printf("Alegeti optiune: ");
-            
+
             int optiune = citireInt();
-            
+
             switch (optiune) {
-                case 1:
-                    console.printf("ID eveniment: ");
-                    double vanzari = service.raportVanzariPerEveniment(citireInt());
-                    console.printf("Total vanzari: %.2f lei\n", vanzari);
-                    break;
-                case 2:
-                    console.printf("ID locatie: ");
-                    double vanzariLoc = service.raportVanzariPerLocatie(citireInt());
-                    console.printf("Total vanzari: %.2f lei\n", vanzariLoc);
-                    break;
-                case 3:
-                    console.printf("ID eveniment: ");
-                    int count = service.countBileteVandute(citireInt());
-                    console.printf("Bilete vandute: %d\n", count);
-                    break;
                 case 0:
                     back = true;
                     break;
@@ -782,8 +724,54 @@ public class main {
             }
         }
     }
+    private static void exportBiletConsola() {
+        int userId = currentUser.getId();
 
-    // ===== HELPERS =====
+        List<Bilet> bilete = service.getBileteUser(userId);
+        if (bilete.isEmpty()) {
+            console.printf("Nu ai bilete de exportat.\n");
+            return;
+        }
+
+        int idx = alegeBiletDinLista(bilete, "Alege bilet pentru export: ");
+        if (idx < 0) {
+            return;
+        }
+        Bilet b = bilete.get(idx);
+
+        service.exportBiletToTXT(b);
+        console.printf("Bilet exportat cu succes!\n");
+    }
+
+    private static void adaugaRecenzieUserConsola() {
+        console.printf("\n--- Adauga Recenzie ---\n");
+        int userId = currentUser.getId();
+
+        service.showAllEvenimente();
+        console.printf("ID eveniment: ");
+        int evenimentId = citireInt();
+
+        Eveniment ev = service.cautaEvenimentDupaId(evenimentId);
+        if (ev == null) {
+            console.printf("Eveniment invalid!\n");
+            return;
+        }
+
+        console.printf("Nota (1-5): ");
+        int nota = citireInt();
+
+        if (nota < 1 || nota > 5) {
+            console.printf("Nota trebuie sa fie intre 1 si 5!\n");
+            return;
+        }
+
+        console.printf("Comentariu: ");
+        String comentariu = citireLinie();
+
+        service.adaugaRecenzie(currentUser, ev, nota, comentariu);
+        console.printf("Recenzie adaugata cu succes!\n");
+    }
+
     private static String citireLinie() {
         String s = console.readLine();
         return s == null ? "" : s.trim();
@@ -873,7 +861,7 @@ public class main {
         for (int i = 0; i < bilete.size(); i++) {
             Bilet b = bilete.get(i);
             String ev = b.getEveniment() != null ? b.getEveniment().getNume() : "?";
-            console.printf("%d. BiletID=%d | %s | %s\n", i + 1, b.getId(), ev, b.getTipBilet());
+            console.printf("%d. BiletID=%d - %s - %s\n", i + 1, b.getId(), ev, b.getTipBilet());
         }
         console.printf(prompt);
         int opt = citireInt();

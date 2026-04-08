@@ -15,4 +15,9 @@ public class Museum extends Eveniment{
     public String getTipEveniment() {
         return "MUSEUM";
     }
+
+    @Override
+    public String getDetaliiSpecifice() {
+        return "Muzeu: " + nume_muzeu + " - Expozitie: " + tip_expozitie;
+    }
 }

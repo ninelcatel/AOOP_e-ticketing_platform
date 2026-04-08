@@ -19,4 +19,9 @@ public class Theatre extends Eveniment {
     public String getTipEveniment() {
         return "THEATRE";
     }
+
+    @Override
+    public String getDetaliiSpecifice() {
+        return "Piesa: " + piesa + " - Regizor: " + regizor;
+    }
 }

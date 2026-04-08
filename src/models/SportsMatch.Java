@@ -23,4 +23,9 @@ public class SportsMatch extends Eveniment {
     public String getTipEveniment() {
         return "SPORTS_MATCH";
     }
+
+    @Override
+    public String getDetaliiSpecifice() {
+        return echipa_gazda + " vs " + echipa_oaspete + " - " + competitie;
+    }
 }

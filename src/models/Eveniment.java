@@ -40,4 +40,5 @@ public abstract class Eveniment {
     public void addRecenzie(Recenzie recenzie) { this.recenzii.add(recenzie); }
 
     public abstract String getTipEveniment();
+    public abstract String getDetaliiSpecifice();
 }

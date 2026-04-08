@@ -11,6 +11,9 @@ public class EvenimentService {
     private List<Tranzactie> tranzactii;
     private List<CodPromo> coduriPromo;
 
+    private Set<String> emailUnice;
+    private Map<Integer, Eveniment> evenimenteMap;
+
     private int nextEvenimentId = 1;
     private int nextLocatieId = 1;
     private int nextUserId = 1;
@@ -28,6 +31,8 @@ public class EvenimentService {
         this.recenzii = new ArrayList<>();
         this.tranzactii = new ArrayList<>();
         this.coduriPromo = new ArrayList<>();
+        this.emailUnice = new HashSet<>();
+        this.evenimenteMap = new HashMap<>();
     }
 
     private double calcPretBilet(Eveniment eveniment, TipBilet tip) {
@@ -95,29 +100,46 @@ public class EvenimentService {
             eveniment.getLocatie().addEveniment(eveniment);
         }
         this.evenimente.add(eveniment);
+        this.evenimenteMap.put(eveniment.getId(), eveniment);
     }
     public void stergeEveniment(int evenimentId) {
         this.evenimente.removeIf(e -> e.getId() == evenimentId);
+        this.evenimenteMap.remove(evenimentId);
     }
     public void modificaEveniment(int evenimentId, Eveniment evenimentNou) {
         for (int i = 0; i < this.evenimente.size(); i++) {
             if (this.evenimente.get(i).getId() == evenimentId) {
                 this.evenimente.set(i, evenimentNou);
+                this.evenimenteMap.put(evenimentId, evenimentNou);
                 break;
             }
         }
     }
     public Eveniment cautaEvenimentDupaId(int evenimentId) {
-        return this.evenimente.stream()
-                .filter(e -> e.getId() == evenimentId)
-                .findFirst()
-                .orElse(null);
+        // Using Map for faster O(1) lookup instead of O(n) stream
+        return this.evenimenteMap.get(evenimentId);
     }
 
     public void cumparaBilet(User user, Eveniment eveniment, TipBilet tip, Comanda comanda) {
         if (user == null || eveniment == null) {
             System.out.println("User sau eveniment invalid!");
             return;
+        }
+
+        // Verificare pentru early bird - doar cu o luna inainte
+        if (tip == TipBilet.EARLY_BIRD) {
+            Date currentDate = new Date();
+            Date eventDate = eveniment.getData();
+
+            // Calculam diferenta in milisecunde si convertim la zile
+            long diffInMillies = eventDate.getTime() - currentDate.getTime();
+            long diffInDays = diffInMillies / (24 * 60 * 60 * 1000);
+
+            if (diffInDays < 30) {
+                System.out.println("Biletele Early Bird pot fi cumparate doar cu cel putin o luna (30 zile) inainte de eveniment!");
+                System.out.println("Zile ramase pana la eveniment: " + diffInDays);
+                return;
+            }
         }
 
         Locatie locatie = eveniment.getLocatie();
@@ -223,8 +245,14 @@ public class EvenimentService {
     }
 
     public List<Eveniment> cautaEvenimentDupaNume(String nume) {
+        if (nume == null || nume.trim().isEmpty()) {
+            return new ArrayList<>();
+        }
+
+        String pattern = ".*" + nume.toLowerCase().trim() + ".*";
+
         return this.evenimente.stream()
-                .filter(e -> e.getNume().toLowerCase().contains(nume.toLowerCase()))
+                .filter(e -> e.getNume().toLowerCase().matches(pattern))
                 .collect(Collectors.toList());
     }
     public List<Eveniment> filtreazaEvenimenteDupaTip(String tipEveniment) {
@@ -321,9 +349,6 @@ public class EvenimentService {
                 .filter(r -> r.getEveniment().getId() == evenimentId)
                 .collect(Collectors.toList());
     }
-    
-    // public void exportareBileteTXT(int evenimentId, String filePath) {  
-    // }
 
     public void adaugaUser(User user) {
         if (user == null) {
@@ -332,6 +357,9 @@ public class EvenimentService {
 
         user.setId(nextUserId++);
         this.users.add(user);
+        if (user.getEmail() != null) {
+            this.emailUnice.add(user.getEmail().toLowerCase());
+        }
     }
 
     public void adaugaCodPromo(CodPromo cod) {
@@ -360,6 +388,13 @@ public class EvenimentService {
                 .filter(u -> u.getEmail() != null && u.getEmail().trim().toLowerCase().equals(e))
                 .findFirst()
                 .orElse(null);
+    }
+
+    public boolean isEmailDejaFolosit(String email) {
+        if (email == null) {
+            return false;
+        }
+        return this.emailUnice.contains(email.toLowerCase());
     }
 
     public User authenticateUser(String email, String parola) {
@@ -438,6 +473,40 @@ public class EvenimentService {
             System.out.println("Nume: " + user.getNume());
             System.out.println("Email: " + user.getEmail());
             System.out.println("Parola: " + user.getParola());
+            System.out.println("Balanta: " + String.format("%.2f", user.getBalanta()) + " lei");
+
+            // Afisare comenzi
+            System.out.println("\n--- COMENZI ---");
+            if (user.getComenzi().isEmpty()) {
+                System.out.println("Nu ai comenzi.");
+            } else {
+                for (Comanda c : user.getComenzi()) {
+                    System.out.println("Comanda " + c.getId() + " din " + c.getDataComanda());
+                    System.out.println("   Status: " + c.getStatus());
+                    System.out.println("   Bilete: " + c.getBilete().size());
+                    if (c.getTranzactie() != null) {
+                        System.out.println("   Total: " + String.format("%.2f", c.getTranzactie().getSuma()) + " lei");
+                    }
+                    System.out.println();
+                }
+            }
+
+            // Afisare tranzactii
+            System.out.println("\n--- TRANZACTII ---");
+            List<Tranzactie> userTransactions = this.tranzactii.stream()
+                    .filter(t -> t.getComanda() != null && t.getComanda().getUser().getId() == userId)
+                    .collect(Collectors.toList());
+
+            if (userTransactions.isEmpty()) {
+                System.out.println("Nu ai tranzactii.");
+            } else {
+                for (Tranzactie t : userTransactions) {
+                    System.out.println("Tranzactie " + t.getId() + " din " + t.getDataTranzactie());
+                    System.out.println("   Suma: " + String.format("%.2f", t.getSuma()) + " lei");
+                    System.out.println("   Pentru comanda: " + t.getComanda().getId());
+                    System.out.println();
+                }
+            }
             System.out.println("=========================\n");
         } else {
             System.out.println("User inexistent!");
@@ -572,7 +641,14 @@ public class EvenimentService {
         }
         System.out.println("\n========== TOATE EVENIMENTELE ==========");
         for (Eveniment e : this.evenimente) {
-            System.out.println(e.getId() + ". " + e.getNume() + " (" + e.getTipEveniment() + ") - " + e.getData());
+            String locatieInfo = e.getLocatie() != null ?
+                e.getLocatie().getNume() + ", " + e.getLocatie().getCountry() : "Necunoscuta";
+            System.out.println(e.getId() + ". " + e.getNume() + " (" + e.getTipEveniment() + ")");
+            System.out.println("   Data: " + e.getData());
+            System.out.println("   Pret: " + String.format("%.2f", e.getPret()) + " lei");
+            System.out.println("   Locatie: " + locatieInfo);
+            System.out.println("   Detalii: " + e.getDetaliiSpecifice());
+            System.out.println();
         }
         System.out.println("=======================================\n");
     }
@@ -599,5 +675,56 @@ public class EvenimentService {
             System.out.println(c.getId() + ". User: " + c.getUser().getNume() + " - Status: " + c.getStatus());
         }
         System.out.println("=====================================\n");
+    }
+
+    public void showAllBilete() {
+        if (this.bilete.isEmpty()) {
+            System.out.println("Niciun bilet in sistem!");
+            return;
+        }
+        System.out.println("\n========== TOATE BILETELE ==========");
+        for (Bilet b : this.bilete) {
+            String eveniment = b.getEveniment() != null ? b.getEveniment().getNume() : "Necunoscut";
+            String user = b.getUser() != null ? b.getUser().getNume() : "Necunoscut";
+            System.out.println("Bilet " + b.getId() + " - " + eveniment);
+            System.out.println("   Utilizator: " + user);
+            System.out.println("   Tip: " + b.getTipBilet());
+            System.out.println("   Status: " + (b.isValid() ? "Valid" : "Invalid"));
+            System.out.println();
+        }
+        System.out.println("=====================================\n");
+    }
+
+    public void exportBiletToTXT(Bilet bilet) {
+        if (bilet == null) {
+            return;
+        }
+
+        try {
+            String fileName = "bilet_" + bilet.getId() + ".txt";
+            java.io.FileWriter writer = new java.io.FileWriter(fileName);
+
+            writer.write("========== BILET EVENIMENT ==========\n");
+            writer.write("ID Bilet: " + bilet.getId() + "\n");
+            writer.write("Eveniment: " + bilet.getEveniment().getNume() + "\n");
+            writer.write("Tip Eveniment: " + bilet.getEveniment().getTipEveniment() + "\n");
+            writer.write("Data Eveniment: " + bilet.getEveniment().getData() + "\n");
+            writer.write("Locatie: " + bilet.getEveniment().getLocatie().getNume() + "\n");
+            writer.write("Adresa: " + bilet.getEveniment().getLocatie().getAdresa() + "\n");
+            writer.write("Tara: " + bilet.getEveniment().getLocatie().getCountry() + "\n");
+            writer.write("Capacitate: " + bilet.getEveniment().getLocatie().getCapacitate() + "\n");
+            writer.write("Posesor: " + bilet.getUser().getNume() + "\n");
+            writer.write("Email: " + bilet.getUser().getEmail() + "\n");
+            writer.write("Tip Bilet: " + bilet.getTipBilet() + "\n");
+            writer.write("Pret: " + String.format("%.2f", calcPretBilet(bilet.getEveniment(), bilet.getTipBilet())) + " lei\n");
+            writer.write("Status: " + (bilet.isValid() ? "Valid" : "Invalid") + "\n");
+            writer.write("Detalii Eveniment: " + bilet.getEveniment().getDetaliiSpecifice() + "\n");
+            writer.write("=====================================\n");
+
+            writer.close();
+            System.out.println("Bilet exportat in fisierul: " + fileName);
+        } catch (java.io.IOException e) {
+            System.out.println("Eroare la exportul biletului: " + e.getMessage());
+        }
     }
 }

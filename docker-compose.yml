@@ -1,0 +1,23 @@
+services:
+  app:
+    build: .
+    container_name: paoj_app
+    depends_on:
+      - db
+    stdin_open: true
+    tty: true
+    environment:
+      - DB_URL=jdbc:mysql://db:3306/paoj_db
+      - DB_USER=root
+      - DB_PASS=ninel4
+    volumes:
+      - ./audit.csv:/project/audit.csv
+
+  db:
+    image: mysql:8.3
+    container_name: paoj_db
+    environment:
+      - MYSQL_ROOT_PASSWORD=ninel4
+      - MYSQL_DATABASE=paoj_db
+    ports:
+      - "3306:3306"

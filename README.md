@@ -38,3 +38,7 @@ java -cp bin main
 ```
 
 # Etapa 2: 
+```
+# pentru rula:
+docker compose run [--build] --rm app 
+```

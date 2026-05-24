@@ -1,0 +1,7 @@
+bin/
+*.class
+sources.txt
+exports/
+bilet_*.txt
+audit.csv
+.vscode/

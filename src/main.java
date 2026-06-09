@@ -1,9 +1,12 @@
 import java.io.Console;
 import java.text.SimpleDateFormat;
 import java.util.Date;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 
 import models.*;
+import services.*;
 
 public class main {
     private static EvenimentService service;
@@ -105,6 +108,13 @@ public class main {
         console.printf("Logout efectuat.\n");
     }
 
+    // Reincarcam userul curent din DB dupa operatiile care ii modifica balanta
+    private static void refreshCurrentUser() {
+        if (currentUser != null) {
+            currentUser = service.getUserById(currentUser.getId());
+        }
+    }
+
     private static boolean meniuAdmin() {
         console.printf("\n========== MENIU ADMIN ==========\n");
         console.printf("1. Gestionare evenimente\n");
@@ -196,8 +206,8 @@ public class main {
                 raportRecenziiEvenimentConsola();
                 return true;
             case 11:
+                refreshCurrentUser();
                 service.showUser(currentUser.getId());
-                console.printf("Balanta: %.2f lei\n", currentUser.getBalanta());
                 return true;
             case 0:
                 logout();
@@ -350,7 +360,9 @@ public class main {
                     e.setData(dataNoua);
                 }
             }
-            
+
+            // Persistam modificarea in baza de date
+            service.modificaEveniment(id, e);
             console.printf("Eveniment modificat!\n");
         } else {
             console.printf("Eveniment nu gasit!\n");
@@ -486,24 +498,59 @@ public class main {
         console.printf("ID eveniment: ");
         int evenimentId = citireInt();
 
-        TipBilet tip = citireTipBilet();
-        if (tip == null) {
+        // Construim un "cos": adaugam perechi (tip, cantitate)
+        Map<TipBilet, Integer> cos = new LinkedHashMap<>();
+        boolean gata = false;
+        while (!gata) {
+            TipBilet tip = citireTipBilet();
+            if (tip == null) {
+                continue;
+            }
+
+            console.printf("Cantitate: ");
+            int cantitate = citireInt();
+            if (cantitate <= 0) {
+                console.printf("Cantitate invalida!\n");
+                continue;
+            }
+
+            // Daca tipul exista deja in cos, adunam cantitatile
+            cos.merge(tip, cantitate, Integer::sum);
+            console.printf("Adaugat in cos: %d x %s\n", cantitate, tip);
+
+            if (!confirm("Mai adaugi un tip de bilet?")) {
+                gata = true;
+            }
+        }
+
+        if (cos.isEmpty()) {
+            console.printf("Cos gol, operatie anulata.\n");
             return;
         }
 
-        if (!confirm("Confirmi cumpararea biletului?")) {
+        // Afisam cosul inainte de confirmare
+        console.printf("\n--- Cosul tau ---\n");
+        int totalBilete = 0;
+        for (Map.Entry<TipBilet, Integer> linie : cos.entrySet()) {
+            console.printf("%d x %s\n", linie.getValue(), linie.getKey());
+            totalBilete += linie.getValue();
+        }
+
+        if (!confirm("Confirmi cumpararea a " + totalBilete + " bilet(e)?")) {
             console.printf("Operatie anulata.\n");
             return;
         }
 
-        Bilet bilet = service.cumparaBilet(userId, evenimentId, tip);
-        if (bilet == null) {
+        Comanda comanda = service.cumparaCos(userId, evenimentId, cos);
+        if (comanda == null) {
             console.printf("Cumparare esuata.\n");
             return;
         }
+        refreshCurrentUser();
 
-        double suma = bilet.getComanda() != null && bilet.getComanda().getTranzactie() != null ? bilet.getComanda().getTranzactie().getSuma() : 0;
-        console.printf("Bilet cumparat cu succes! ID bilet=%d - Total=%.2f lei\n", bilet.getId(), suma);
+        double suma = comanda.getTranzactie() != null ? comanda.getTranzactie().getSuma() : 0;
+        console.printf("Comanda finalizata cu succes! ID comanda=%d - Bilete=%d - Total=%.2f lei\n",
+                comanda.getId(), comanda.getBilete().size(), suma);
     }
 
     private static void transferBiletConsola() {
@@ -559,6 +606,9 @@ public class main {
         }
 
         boolean ok = service.refundBiletPentruUser(b.getId(), userId);
+        if (ok) {
+            refreshCurrentUser();
+        }
         console.printf(ok ? "Refund efectuat!\n" : "Refund esuat!\n");
     }
 
@@ -576,6 +626,9 @@ public class main {
             return;
         }
         boolean ok = service.topUpBalance(userId, suma);
+        if (ok) {
+            refreshCurrentUser();
+        }
         console.printf(ok ? "Top-up efectuat!\n" : "Top-up esuat!\n");
     }
 

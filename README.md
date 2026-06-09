@@ -38,3 +38,17 @@ java -cp bin main
 ```
 
 # Etapa 2: 
+
+### am folosit mysql
+
+### audit
+* se scrie in `audit.csv` la fiecare actiune (format: nume_actiune, timestamp)
+
+### pentru rulare
+```
+docker compose up -d db [&& sleep 10] 
+```
+
+```
+docker compose run [--build] --rm app 
+```

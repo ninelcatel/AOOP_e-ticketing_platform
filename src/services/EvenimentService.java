@@ -1,38 +1,36 @@
-package models;
+package services;
+import models.*;
+import db.*;
 import java.util.*;
 import java.util.stream.Collectors;
 
 public class EvenimentService {
-    private List<Eveniment> evenimente;
-    private List<User> users;
-    private List<Bilet> bilete;
-    private List<Comanda> comenzi;
-    private List<Recenzie> recenzii;
-    private List<Tranzactie> tranzactii;
-    private List<CodPromo> coduriPromo;
-
-    private Set<String> emailUnice;
-    private Map<Integer, Eveniment> evenimenteMap;
-
-    private int nextEvenimentId = 1;
-    private int nextLocatieId = 1;
-    private int nextUserId = 1;
-    private int nextBiletId = 1;
-    private int nextComandaId = 1;
-    private int nextRecenzieId = 1;
-    private int nextTranzactieId = 1;
-    private int nextCodPromoId = 1;
+    private EvenimentDAO evenimentDAO;
+    private LocatieDAO locatieDAO;
+    private UserDAO userDAO;
+    private BiletDAO biletDAO;
+    private ComandaDAO comandaDAO;
+    private TranzactieDAO tranzactieDAO;
+    private RecenzieDAO recenzieDAO;
+    private CodPromoDAO codPromoDAO;
+    private AuditService audit;
 
     public EvenimentService() {
-        this.evenimente = new ArrayList<>();
-        this.users = new ArrayList<>();
-        this.bilete = new ArrayList<>();
-        this.comenzi = new ArrayList<>();
-        this.recenzii = new ArrayList<>();
-        this.tranzactii = new ArrayList<>();
-        this.coduriPromo = new ArrayList<>();
-        this.emailUnice = new HashSet<>();
-        this.evenimenteMap = new HashMap<>();
+        // Initializam baza de date (creeaza tabelele daca nu exista)
+        DatabaseInitializer.initializeaza();
+
+        this.evenimentDAO = EvenimentDAO.getInstance();
+        this.locatieDAO = LocatieDAO.getInstance();
+        this.userDAO = UserDAO.getInstance();
+        this.biletDAO = BiletDAO.getInstance();
+        this.comandaDAO = ComandaDAO.getInstance();
+        this.tranzactieDAO = TranzactieDAO.getInstance();
+        this.recenzieDAO = RecenzieDAO.getInstance();
+        this.codPromoDAO = CodPromoDAO.getInstance();
+        this.audit = AuditService.getInstance();
+
+        // Populam baza de date cu date initiale daca este goala
+        DatabaseSeeder.seed();
     }
 
     private double calcPretBilet(Eveniment eveniment, TipBilet tip) {
@@ -65,7 +63,7 @@ public class EvenimentService {
             return suma;
         }
 
-        CodPromo promo = this.coduriPromo.stream()
+        CodPromo promo = this.codPromoDAO.readAll().stream()
                 .filter(cp -> cp.getCod() != null && cp.getCod().equals(cod) && cp.isActiv())
                 .findFirst()
                 .orElse(null);
@@ -81,10 +79,10 @@ public class EvenimentService {
     }
 
     private long countBileteValidePentruEveniment(Eveniment eveniment) {
-        if (eveniment == null || eveniment.getBilete() == null) {
+        if (eveniment == null) {
             return 0;
         }
-        return eveniment.getBilete().stream().filter(Bilet::isValid).count();
+        return this.biletDAO.readByEveniment(eveniment.getId()).stream().filter(Bilet::isValid).count();
     }
 
     public void adaugaEveniment(Eveniment eveniment) {
@@ -92,37 +90,41 @@ public class EvenimentService {
             return;
         }
 
-        eveniment.setId(nextEvenimentId++);
+        // Persistam intai locatia, ca sa avem un id valid pentru FK
         if (eveniment.getLocatie() != null) {
             if (eveniment.getLocatie().getId() <= 0) {
-                eveniment.getLocatie().setId(nextLocatieId++);
+                this.locatieDAO.create(eveniment.getLocatie());
             }
-            eveniment.getLocatie().addEveniment(eveniment);
         }
-        this.evenimente.add(eveniment);
-        this.evenimenteMap.put(eveniment.getId(), eveniment);
+        this.evenimentDAO.create(eveniment);
+        this.audit.logActiune("adaugaEveniment");
     }
     public void stergeEveniment(int evenimentId) {
-        this.evenimente.removeIf(e -> e.getId() == evenimentId);
-        this.evenimenteMap.remove(evenimentId);
+        this.evenimentDAO.delete(evenimentId);
+        this.audit.logActiune("stergeEveniment");
     }
     public void modificaEveniment(int evenimentId, Eveniment evenimentNou) {
-        for (int i = 0; i < this.evenimente.size(); i++) {
-            if (this.evenimente.get(i).getId() == evenimentId) {
-                this.evenimente.set(i, evenimentNou);
-                this.evenimenteMap.put(evenimentId, evenimentNou);
-                break;
-            }
-        }
+        evenimentNou.setId(evenimentId);
+        this.evenimentDAO.update(evenimentNou);
+        this.audit.logActiune("modificaEveniment");
     }
     public Eveniment cautaEvenimentDupaId(int evenimentId) {
-        // Using Map for faster O(1) lookup instead of O(n) stream
-        return this.evenimenteMap.get(evenimentId);
+        return this.evenimentDAO.read(evenimentId);
     }
 
     public void cumparaBilet(User user, Eveniment eveniment, TipBilet tip, Comanda comanda) {
+        // O comanda cu un singur bilet - delegam la varianta cu cantitate
+        cumparaBilete(user, eveniment, tip, comanda, 1);
+    }
+
+    public void cumparaBilete(User user, Eveniment eveniment, TipBilet tip, Comanda comanda, int cantitate) {
         if (user == null || eveniment == null) {
             System.out.println("User sau eveniment invalid!");
+            return;
+        }
+
+        if (cantitate <= 0) {
+            System.out.println("Cantitate invalida!");
             return;
         }
 
@@ -146,8 +148,8 @@ public class EvenimentService {
         if (locatie != null) {
             int capacitate = locatie.getCapacitate();
             long vandute = countBileteValidePentruEveniment(eveniment);
-            if (capacitate <= 0 || vandute >= capacitate) {
-                System.out.println("Capacitate atinsa, nu mai sunt bilete disponibile.");
+            if (capacitate <= 0 || vandute + cantitate > capacitate) {
+                System.out.println("Capacitate insuficienta! Locuri ramase: " + Math.max(0, capacitate - vandute));
                 return;
             }
         }
@@ -157,7 +159,8 @@ public class EvenimentService {
             pretBilet = aplicaCodPromoLaSuma(pretBilet, comanda.getCodPromo().getCod());
         }
 
-        if (user.getBalanta() < pretBilet) {
+        double pretTotal = pretBilet * cantitate;
+        if (user.getBalanta() < pretTotal) {
             System.out.println("Fonduri insuficiente! Top-up necesar.");
             return;
         }
@@ -165,26 +168,40 @@ public class EvenimentService {
         if (comanda == null) {
             comanda = creeazaComanda(user);
         }
+        // Persistam comanda inainte de a-i atasa bilete/tranzactii
+        comanda.setStatus("IN_PROGRESS");
+        this.comandaDAO.create(comanda);
 
-        Bilet bilet = new Bilet(nextBiletId++, eveniment, user, tip);
-        this.bilete.add(bilet);
-        comanda.addBilet(bilet);
-        bilet.setComanda(comanda);
+        // Cream cate un bilet pentru fiecare bucata, in aceeasi comanda
+        for (int i = 0; i < cantitate; i++) {
+            Bilet bilet = new Bilet(0, eveniment, user, tip);
+            bilet.setComanda(comanda);
+            comanda.addBilet(bilet);
+            this.biletDAO.create(bilet);
+        }
 
-        user.setBalanta(user.getBalanta() - pretBilet);
+        user.setBalanta(user.getBalanta() - pretTotal);
+        this.userDAO.update(user);
 
-        comanda.setTranzactie(new Tranzactie(nextTranzactieId++, comanda, pretBilet, new Date()));
+        Tranzactie tranzactie = new Tranzactie(0, comanda, pretTotal, new Date());
+        comanda.setTranzactie(tranzactie);
         comanda.setStatus("FINALIZATA");
-        this.comenzi.add(comanda);
-        this.tranzactii.add(comanda.getTranzactie());
+        this.tranzactieDAO.create(tranzactie);
+        this.comandaDAO.update(comanda);
 
+        this.audit.logActiune("cumparaBilet");
     }
 
     public Comanda creeazaComanda(User user) {
-        return new Comanda(nextComandaId++, user, new Date());
+        return new Comanda(0, user, new Date());
     }
 
     public Bilet cumparaBilet(int userId, int evenimentId, TipBilet tip) {
+        Comanda comanda = cumparaBilete(userId, evenimentId, tip, 1);
+        return comanda == null || comanda.getBilete().isEmpty() ? null : comanda.getBilete().get(0);
+    }
+
+    public Comanda cumparaBilete(int userId, int evenimentId, TipBilet tip, int cantitate) {
         User user = getUserById(userId);
         Eveniment eveniment = cautaEvenimentDupaId(evenimentId);
         if (user == null || eveniment == null) {
@@ -192,37 +209,131 @@ public class EvenimentService {
         }
 
         Comanda comanda = creeazaComanda(user);
-        cumparaBilet(user, eveniment, tip, comanda);
-        return comanda.getBilete().isEmpty() ? null : comanda.getBilete().get(0);
+        cumparaBilete(user, eveniment, tip, comanda, cantitate);
+        return comanda.getBilete().isEmpty() ? null : comanda;
+    }
+
+    // Cumparare cu tipuri mixte intr-o singura comanda (un "cos").
+    // cos = map de la tip de bilet la cantitate (ex: VIP->1, STUDENT->2)
+    public Comanda cumparaCos(int userId, int evenimentId, Map<TipBilet, Integer> cos) {
+        User user = getUserById(userId);
+        Eveniment eveniment = cautaEvenimentDupaId(evenimentId);
+        if (user == null || eveniment == null) {
+            System.out.println("User sau eveniment invalid!");
+            return null;
+        }
+        if (cos == null || cos.isEmpty()) {
+            System.out.println("Cosul este gol!");
+            return null;
+        }
+
+        // Cantitatea totala de bilete din cos
+        int cantitateTotala = 0;
+        for (int q : cos.values()) {
+            cantitateTotala += q;
+        }
+        if (cantitateTotala <= 0) {
+            System.out.println("Cantitate invalida!");
+            return null;
+        }
+
+        // Verificare early bird pentru fiecare tip cerut
+        if (cos.containsKey(TipBilet.EARLY_BIRD)) {
+            long diffInMillies = eveniment.getData().getTime() - new Date().getTime();
+            long diffInDays = diffInMillies / (24 * 60 * 60 * 1000);
+            if (diffInDays < 30) {
+                System.out.println("Biletele Early Bird pot fi cumparate doar cu cel putin o luna (30 zile) inainte de eveniment!");
+                System.out.println("Zile ramase pana la eveniment: " + diffInDays);
+                return null;
+            }
+        }
+
+        // Verificare capacitate pentru tot cosul
+        Locatie locatie = eveniment.getLocatie();
+        if (locatie != null) {
+            int capacitate = locatie.getCapacitate();
+            long vandute = countBileteValidePentruEveniment(eveniment);
+            if (capacitate <= 0 || vandute + cantitateTotala > capacitate) {
+                System.out.println("Capacitate insuficienta! Locuri ramase: " + Math.max(0, capacitate - vandute));
+                return null;
+            }
+        }
+
+        // Calculam pretul total al cosului
+        double pretTotal = 0;
+        for (Map.Entry<TipBilet, Integer> linie : cos.entrySet()) {
+            pretTotal += calcPretBilet(eveniment, linie.getKey()) * linie.getValue();
+        }
+
+        if (user.getBalanta() < pretTotal) {
+            System.out.println("Fonduri insuficiente! Top-up necesar.");
+            return null;
+        }
+
+        // Cream comanda si toate biletele (de toate tipurile) in aceeasi comanda
+        Comanda comanda = creeazaComanda(user);
+        comanda.setStatus("IN_PROGRESS");
+        this.comandaDAO.create(comanda);
+
+        for (Map.Entry<TipBilet, Integer> linie : cos.entrySet()) {
+            TipBilet tip = linie.getKey();
+            int cantitate = linie.getValue();
+            for (int i = 0; i < cantitate; i++) {
+                Bilet bilet = new Bilet(0, eveniment, user, tip);
+                bilet.setComanda(comanda);
+                comanda.addBilet(bilet);
+                this.biletDAO.create(bilet);
+            }
+        }
+
+        user.setBalanta(user.getBalanta() - pretTotal);
+        this.userDAO.update(user);
+
+        Tranzactie tranzactie = new Tranzactie(0, comanda, pretTotal, new Date());
+        comanda.setTranzactie(tranzactie);
+        comanda.setStatus("FINALIZATA");
+        this.tranzactieDAO.create(tranzactie);
+        this.comandaDAO.update(comanda);
+
+        this.audit.logActiune("cumparaBilet");
+        return comanda;
     }
 
     public void refundBilet(int biletId) {
-        Bilet bilet = this.bilete.stream()
-                .filter(b -> b.getId() == biletId)
-                .findFirst()
-                .orElse(null);
+        Bilet bilet = this.biletDAO.read(biletId);
 
         if (bilet != null && bilet.isValid()) {
             Comanda comanda = bilet.getComanda();
-            double suma = comanda != null && comanda.getTranzactie() != null ? comanda.getTranzactie().getSuma() : 0;
+
+            // Restituim doar pretul biletului individual, nu totalul comenzii
+            double suma = calcPretBilet(bilet.getEveniment(), bilet.getTipBilet());
+
             User user = bilet.getUser();
             user.setBalanta(user.getBalanta() + suma);
-            comanda.setStatus("REFUNDATA");
-            this.bilete.remove(bilet);
+            this.userDAO.update(user);
+
+            // Marcam biletul invalid si il stergem din DB
+            bilet.setValid(false);
+            this.biletDAO.delete(biletId);
+
+            // Comanda devine REFUNDATA doar daca nu mai are niciun bilet valid;
+            // altfel ramane FINALIZATA (refund partial dintr-o comanda cu mai multe bilete)
             if (comanda != null) {
-                comanda.getBilete().remove(bilet);
+                long bileteRamase = this.biletDAO.readAll().stream()
+                        .filter(b -> b.getComanda() != null && b.getComanda().getId() == comanda.getId() && b.isValid())
+                        .count();
+                if (bileteRamase == 0) {
+                    comanda.setStatus("REFUNDATA");
+                    this.comandaDAO.update(comanda);
+                }
             }
-            if (bilet.getEveniment() != null && bilet.getEveniment().getBilete() != null) {
-                bilet.getEveniment().getBilete().remove(bilet);
-            }
+
+            this.audit.logActiune("refundBilet");
         }
     }
 
     public boolean refundBiletPentruUser(int biletId, int userId) {
-        Bilet bilet = this.bilete.stream()
-                .filter(b -> b.getId() == biletId)
-                .findFirst()
-                .orElse(null);
+        Bilet bilet = this.biletDAO.read(biletId);
 
         if (bilet == null || !bilet.isValid() || bilet.getUser() == null || bilet.getUser().getId() != userId) {
             return false;
@@ -233,13 +344,9 @@ public class EvenimentService {
     }
 
     public List<Comanda> getIstoricComenziUser(int userId) {
-        User user = this.users.stream()
-                .filter(u -> u.getId() == userId)
-                .findFirst()
-                .orElse(null);
-
-        if (user != null && !user.getComenzi().isEmpty()) {
-            return user.getComenzi();
+        List<Comanda> comenzi = this.comandaDAO.readByUser(userId);
+        if (comenzi != null && !comenzi.isEmpty()) {
+            return comenzi;
         }
         return null;
     }
@@ -251,18 +358,20 @@ public class EvenimentService {
 
         String pattern = ".*" + nume.toLowerCase().trim() + ".*";
 
-        return this.evenimente.stream()
+        List<Eveniment> rezultate = this.evenimentDAO.readAll().stream()
                 .filter(e -> e.getNume().toLowerCase().matches(pattern))
                 .collect(Collectors.toList());
+        this.audit.logActiune("cautaEvenimentDupaNume");
+        return rezultate;
     }
     public List<Eveniment> filtreazaEvenimenteDupaTip(String tipEveniment) {
-        return this.evenimente.stream()
+        return this.evenimentDAO.readAll().stream()
                 .filter(e -> e.getTipEveniment().equals(tipEveniment))
                 .collect(Collectors.toList());
     }
     public List<Eveniment> filtreazaEvenimenteDupaLocatie(int locatieId) {
-        return this.evenimente.stream()
-                .filter(e -> e.getLocatie().getId() == locatieId)
+        return this.evenimentDAO.readAll().stream()
+                .filter(e -> e.getLocatie() != null && e.getLocatie().getId() == locatieId)
                 .collect(Collectors.toList());
     }
 
@@ -274,38 +383,51 @@ public class EvenimentService {
         if (t.isEmpty()) {
             return new ArrayList<>();
         }
-        return this.evenimente.stream()
+        List<Eveniment> rezultate = this.evenimentDAO.readAll().stream()
                 .filter(e -> e.getLocatie() != null && e.getLocatie().getCountry() != null && e.getLocatie().getCountry().trim().toLowerCase().equals(t))
                 .collect(Collectors.toList());
+        this.audit.logActiune("filtreazaEvenimenteDupaTara");
+        return rezultate;
     }
     public List<Eveniment> filtreazaEvenimenteDupaData(Date dataStart, Date dataEnd) {
-        return this.evenimente.stream()
+        return this.evenimentDAO.readAll().stream()
                 .filter(e -> !e.getData().before(dataStart) && !e.getData().after(dataEnd))
                 .collect(Collectors.toList());
     }
 
     public double raportVanzariPerLocatie(int locatieId) {
-        return this.comenzi.stream()
+        return this.comandaDAO.readAll().stream()
                 .filter(c -> "FINALIZATA".equals(c.getStatus()))
-                .filter(c -> !c.getBilete().isEmpty() && c.getBilete().get(0).getEveniment().getLocatie().getId() == locatieId)
-                .mapToDouble(c -> c.getTranzactie().getSuma())
+                .filter(c -> {
+                    List<Bilet> bileteComanda = this.biletDAO.readAll().stream()
+                            .filter(b -> b.getComanda() != null && b.getComanda().getId() == c.getId())
+                            .collect(Collectors.toList());
+                    return !bileteComanda.isEmpty() && bileteComanda.get(0).getEveniment().getLocatie() != null
+                            && bileteComanda.get(0).getEveniment().getLocatie().getId() == locatieId;
+                })
+                .mapToDouble(c -> getTotalVanzariComanda(c.getId()))
                 .sum();
     }
     public double raportVanzariPerEveniment(int evenimentId) {
-        return this.comenzi.stream()
+        return this.comandaDAO.readAll().stream()
                 .filter(c -> "FINALIZATA".equals(c.getStatus()))
-                .filter(c -> !c.getBilete().isEmpty() && c.getBilete().get(0).getEveniment().getId() == evenimentId)
-                .mapToDouble(c -> c.getTranzactie().getSuma())
+                .filter(c -> {
+                    List<Bilet> bileteComanda = this.biletDAO.readAll().stream()
+                            .filter(b -> b.getComanda() != null && b.getComanda().getId() == c.getId())
+                            .collect(Collectors.toList());
+                    return !bileteComanda.isEmpty() && bileteComanda.get(0).getEveniment().getId() == evenimentId;
+                })
+                .mapToDouble(c -> getTotalVanzariComanda(c.getId()))
                 .sum();
     }
     public int countBileteVandute(int evenimentId) {
-        return (int) this.bilete.stream()
-                .filter(b -> b.getEveniment().getId() == evenimentId && b.isValid())
+        return (int) this.biletDAO.readByEveniment(evenimentId).stream()
+                .filter(Bilet::isValid)
                 .count();
     }
 
     public double aplicaCodPromo(Comanda comanda, String codPromo) {
-        CodPromo promo = this.coduriPromo.stream()
+        CodPromo promo = this.codPromoDAO.readAll().stream()
                 .filter(cp -> cp.getCod().equals(codPromo) && cp.isActiv())
                 .findFirst()
                 .orElse(null);
@@ -326,13 +448,12 @@ public class EvenimentService {
     }
 
     public void transferBilet(int biletId, User userNou) {
-        Bilet bilet = this.bilete.stream()
-                .filter(b -> b.getId() == biletId)
-                .findFirst()
-                .orElse(null);
+        Bilet bilet = this.biletDAO.read(biletId);
 
         if (bilet != null) {
             bilet.setUser(userNou);
+            this.biletDAO.update(bilet);
+            this.audit.logActiune("transferBilet");
             System.out.println("Bilet transferat catre user: " + userNou.getNume());
         } else {
             System.out.println("Bilet nu gasit!");
@@ -340,61 +461,47 @@ public class EvenimentService {
     }
 
     public void adaugaRecenzie(User user, Eveniment eveniment, int nota, String comentariu) {
-        Recenzie recenzie = new Recenzie(nextRecenzieId++, user, eveniment, nota, comentariu, new Date());
-        this.recenzii.add(recenzie);
+        Recenzie recenzie = new Recenzie(0, user, eveniment, nota, comentariu, new Date());
+        this.recenzieDAO.create(recenzie);
+        this.audit.logActiune("adaugaRecenzie");
     }
 
     public List<Recenzie> getRecenziiEveniment(int evenimentId) {
-        return this.recenzii.stream()
-                .filter(r -> r.getEveniment().getId() == evenimentId)
-                .collect(Collectors.toList());
+        return this.recenzieDAO.readByEveniment(evenimentId);
     }
 
     public void adaugaUser(User user) {
         if (user == null) {
             return;
         }
-
-        user.setId(nextUserId++);
-        this.users.add(user);
-        if (user.getEmail() != null) {
-            this.emailUnice.add(user.getEmail().toLowerCase());
-        }
+        this.userDAO.create(user);
+        this.audit.logActiune("adaugaUser");
     }
 
     public void adaugaCodPromo(CodPromo cod) {
         if (cod == null) {
             return;
         }
-
-        cod.setId(nextCodPromoId++);
-        this.coduriPromo.add(cod);
+        this.codPromoDAO.create(cod);
+        this.audit.logActiune("adaugaCodPromo");
     }
 
     public User getUserById(int userId) {
-        return this.users.stream()
-                .filter(u -> u.getId() == userId)
-                .findFirst()
-                .orElse(null);
+        return this.userDAO.read(userId);
     }
 
     public User findUserByEmail(String email) {
         if (email == null) {
             return null;
         }
-
-        String e = email.trim().toLowerCase();
-        return this.users.stream()
-                .filter(u -> u.getEmail() != null && u.getEmail().trim().toLowerCase().equals(e))
-                .findFirst()
-                .orElse(null);
+        return this.userDAO.readByEmail(email);
     }
 
     public boolean isEmailDejaFolosit(String email) {
         if (email == null) {
             return false;
         }
-        return this.emailUnice.contains(email.toLowerCase());
+        return this.userDAO.readByEmail(email) != null;
     }
 
     public User authenticateUser(String email, String parola) {
@@ -414,13 +521,13 @@ public class EvenimentService {
             return false;
         }
         u.setBalanta(u.getBalanta() + suma);
+        this.userDAO.update(u);
+        this.audit.logActiune("topUpBalance");
         return true;
     }
 
     public List<Bilet> getBileteUser(int userId) {
-        return this.bilete.stream()
-                .filter(b -> b.getUser() != null && b.getUser().getId() == userId && b.isValid())
-                .collect(Collectors.toList());
+        return this.biletDAO.readByUser(userId);
     }
 
     public boolean transferBiletPentruUser(int biletId, int userIdFrom, int userIdTo) {
@@ -431,10 +538,7 @@ public class EvenimentService {
         if (to == null) {
             return false;
         }
-        Bilet bilet = this.bilete.stream()
-                .filter(b -> b.getId() == biletId)
-                .findFirst()
-                .orElse(null);
+        Bilet bilet = this.biletDAO.read(biletId);
         if (bilet == null || bilet.getUser() == null || bilet.getUser().getId() != userIdFrom) {
             return false;
         }
@@ -443,14 +547,14 @@ public class EvenimentService {
     }
 
     public List<Eveniment> getToateEvenimentele() {
-        return this.evenimente;
+        return this.evenimentDAO.readAll();
     }
     public double getTotalVanzariComanda(int comandaId) {
-        Comanda comanda = this.comenzi.stream()
-                .filter(c -> c.getId() == comandaId)
+        Tranzactie tranzactie = this.tranzactieDAO.readAll().stream()
+                .filter(t -> t.getComanda() != null && t.getComanda().getId() == comandaId)
                 .findFirst()
                 .orElse(null);
-        return comanda != null ? comanda.getTranzactie().getSuma() : 0;
+        return tranzactie != null ? tranzactie.getSuma() : 0;
     }
     public double getAverageRatingEveniment(int evenimentId) {
         List<Recenzie> recenziiEveniment = getRecenziiEveniment(evenimentId);
@@ -462,10 +566,7 @@ public class EvenimentService {
     }
 
     public void showUser(int userId) {
-        User user = this.users.stream()
-                .filter(u -> u.getId() == userId)
-                .findFirst()
-                .orElse(null);
+        User user = this.userDAO.read(userId);
 
         if (user != null) {
             System.out.println("\n========== USER ==========");
@@ -477,15 +578,16 @@ public class EvenimentService {
 
             // Afisare comenzi
             System.out.println("\n--- COMENZI ---");
-            if (user.getComenzi().isEmpty()) {
+            List<Comanda> comenzi = this.comandaDAO.readByUser(userId);
+            if (comenzi.isEmpty()) {
                 System.out.println("Nu ai comenzi.");
             } else {
-                for (Comanda c : user.getComenzi()) {
+                for (Comanda c : comenzi) {
                     System.out.println("Comanda " + c.getId() + " din " + c.getDataComanda());
                     System.out.println("   Status: " + c.getStatus());
-                    System.out.println("   Bilete: " + c.getBilete().size());
-                    if (c.getTranzactie() != null) {
-                        System.out.println("   Total: " + String.format("%.2f", c.getTranzactie().getSuma()) + " lei");
+                    double total = getTotalVanzariComanda(c.getId());
+                    if (total > 0) {
+                        System.out.println("   Total: " + String.format("%.2f", total) + " lei");
                     }
                     System.out.println();
                 }
@@ -493,8 +595,8 @@ public class EvenimentService {
 
             // Afisare tranzactii
             System.out.println("\n--- TRANZACTII ---");
-            List<Tranzactie> userTransactions = this.tranzactii.stream()
-                    .filter(t -> t.getComanda() != null && t.getComanda().getUser().getId() == userId)
+            List<Tranzactie> userTransactions = this.tranzactieDAO.readAll().stream()
+                    .filter(t -> t.getComanda() != null && t.getComanda().getUser() != null && t.getComanda().getUser().getId() == userId)
                     .collect(Collectors.toList());
 
             if (userTransactions.isEmpty()) {
@@ -524,7 +626,7 @@ public class EvenimentService {
             System.out.println("Data: " + eveniment.getData());
             System.out.println("Pret: " + eveniment.getPret());
             System.out.println("Locatie: " + eveniment.getLocatie().getNume());
-            System.out.println("Bilete vandute: " + eveniment.getBilete().size());
+            System.out.println("Bilete vandute: " + countBileteVandute(evenimentId));
             System.out.println("================================\n");
         } else {
             System.out.println("Eveniment inexistent!");
@@ -532,10 +634,7 @@ public class EvenimentService {
     }
 
     public void showBilet(int biletId) {
-        Bilet bilet = this.bilete.stream()
-                .filter(b -> b.getId() == biletId)
-                .findFirst()
-                .orElse(null);
+        Bilet bilet = this.biletDAO.read(biletId);
 
         if (bilet != null) {
             System.out.println("\n========== BILET ==========");
@@ -551,20 +650,17 @@ public class EvenimentService {
     }
 
     public void showComanda(int comandaId) {
-        Comanda comanda = this.comenzi.stream()
-                .filter(c -> c.getId() == comandaId)
-                .findFirst()
-                .orElse(null);
+        Comanda comanda = this.comandaDAO.read(comandaId);
 
         if (comanda != null) {
             System.out.println("\n========== COMANDA ==========");
             System.out.println("ID: " + comanda.getId());
             System.out.println("User: " + comanda.getUser().getNume());
             System.out.println("Data: " + comanda.getDataComanda());
-            System.out.println("Bilete: " + comanda.getBilete().size());
             System.out.println("Status: " + comanda.getStatus());
-            if (comanda.getTranzactie() != null) {
-                System.out.println("Total: " + comanda.getTranzactie().getSuma());
+            double total = getTotalVanzariComanda(comandaId);
+            if (total > 0) {
+                System.out.println("Total: " + total);
             }
             System.out.println("=============================\n");
         } else {
@@ -573,10 +669,7 @@ public class EvenimentService {
     }
 
     public void showRecenzie(int recenzieId) {
-        Recenzie recenzie = this.recenzii.stream()
-                .filter(r -> r.getId() == recenzieId)
-                .findFirst()
-                .orElse(null);
+        Recenzie recenzie = this.recenzieDAO.read(recenzieId);
 
         if (recenzie != null) {
             System.out.println("\n========== RECENZIE ==========");
@@ -593,10 +686,7 @@ public class EvenimentService {
     }
 
     public void showCodPromo(int codPromoId) {
-        CodPromo codPromo = this.coduriPromo.stream()
-                .filter(cp -> cp.getId() == codPromoId)
-                .findFirst()
-                .orElse(null);
+        CodPromo codPromo = this.codPromoDAO.read(codPromoId);
 
         if (codPromo != null) {
             System.out.println("\n========== COD PROMO ==========");
@@ -614,20 +704,17 @@ public class EvenimentService {
     }
 
     public void showLocatie(int locatieId) {
-        Eveniment evenimentTemp = this.evenimente.stream()
-                .filter(e -> e.getLocatie().getId() == locatieId)
-                .findFirst()
-                .orElse(null);
+        Locatie locatie = this.locatieDAO.read(locatieId);
 
-        if (evenimentTemp != null) {
-            Locatie locatie = evenimentTemp.getLocatie();
+        if (locatie != null) {
+            int nrEvenimente = filtreazaEvenimenteDupaLocatie(locatieId).size();
             System.out.println("\n========== LOCATIE ==========");
             System.out.println("ID: " + locatie.getId());
             System.out.println("Nume: " + locatie.getNume());
             System.out.println("Adresa: " + locatie.getAdresa());
             System.out.println("Tara: " + locatie.getCountry());
             System.out.println("Capacitate: " + locatie.getCapacitate());
-            System.out.println("Evenimente: " + locatie.getEvenimente().size());
+            System.out.println("Evenimente: " + nrEvenimente);
             System.out.println("=============================\n");
         } else {
             System.out.println("Locatie inexistenta!");
@@ -635,12 +722,13 @@ public class EvenimentService {
     }
 
     public void showAllEvenimente() {
-        if (this.evenimente.isEmpty()) {
+        List<Eveniment> evenimente = this.evenimentDAO.readAll();
+        if (evenimente.isEmpty()) {
             System.out.println("Niciun eveniment in sistem!");
             return;
         }
         System.out.println("\n========== TOATE EVENIMENTELE ==========");
-        for (Eveniment e : this.evenimente) {
+        for (Eveniment e : evenimente) {
             String locatieInfo = e.getLocatie() != null ?
                 e.getLocatie().getNume() + ", " + e.getLocatie().getCountry() : "Necunoscuta";
             System.out.println(e.getId() + ". " + e.getNume() + " (" + e.getTipEveniment() + ")");
@@ -651,39 +739,43 @@ public class EvenimentService {
             System.out.println();
         }
         System.out.println("=======================================\n");
+        this.audit.logActiune("showAllEvenimente");
     }
 
     public void showAllUsers() {
-        if (this.users.isEmpty()) {
+        List<User> users = this.userDAO.readAll();
+        if (users.isEmpty()) {
             System.out.println("Niciun user in sistem!");
             return;
         }
         System.out.println("\n========== TOTI USERII ==========");
-        for (User u : this.users) {
+        for (User u : users) {
             System.out.println(u.getId() + ". " + u.getNume() + " (" + u.getEmail() + ")");
         }
         System.out.println("==================================\n");
     }
 
     public void showAllComenzi() {
-        if (this.comenzi.isEmpty()) {
+        List<Comanda> comenzi = this.comandaDAO.readAll();
+        if (comenzi.isEmpty()) {
             System.out.println("Nicio comanda in sistem!");
             return;
         }
         System.out.println("\n========== TOATE COMENZILE ==========");
-        for (Comanda c : this.comenzi) {
+        for (Comanda c : comenzi) {
             System.out.println(c.getId() + ". User: " + c.getUser().getNume() + " - Status: " + c.getStatus());
         }
         System.out.println("=====================================\n");
     }
 
     public void showAllBilete() {
-        if (this.bilete.isEmpty()) {
+        List<Bilet> bilete = this.biletDAO.readAll();
+        if (bilete.isEmpty()) {
             System.out.println("Niciun bilet in sistem!");
             return;
         }
         System.out.println("\n========== TOATE BILETELE ==========");
-        for (Bilet b : this.bilete) {
+        for (Bilet b : bilete) {
             String eveniment = b.getEveniment() != null ? b.getEveniment().getNume() : "Necunoscut";
             String user = b.getUser() != null ? b.getUser().getNume() : "Necunoscut";
             System.out.println("Bilet " + b.getId() + " - " + eveniment);
@@ -701,7 +793,13 @@ public class EvenimentService {
         }
 
         try {
-            String fileName = "bilet_" + bilet.getId() + ".txt";
+            // Salvam in folderul "exports" (montat ca volum in docker-compose),
+            // ca biletele exportate sa ramana pe disc dupa oprirea containerului.
+            java.io.File folder = new java.io.File("exports");
+            if (!folder.exists()) {
+                folder.mkdirs();
+            }
+            String fileName = "exports/bilet_" + bilet.getId() + ".txt";
             java.io.FileWriter writer = new java.io.FileWriter(fileName);
 
             writer.write("========== BILET EVENIMENT ==========\n");
@@ -722,6 +820,7 @@ public class EvenimentService {
             writer.write("=====================================\n");
 
             writer.close();
+            this.audit.logActiune("exportBiletToTXT");
             System.out.println("Bilet exportat in fisierul: " + fileName);
         } catch (java.io.IOException e) {
             System.out.println("Eroare la exportul biletului: " + e.getMessage());

@@ -4,9 +4,7 @@ import java.io.IOException;
 import java.text.SimpleDateFormat;
 import java.util.Date;
 
-// Serviciu de audit singleton.
-// Scrie in audit.csv de fiecare data cand este executata o actiune.
-// Structura fisierului: nume_actiune, timestamp
+// Singleton. scrie fiecare actiune in audit.csv (nume_actiune, timestamp).
 public class AuditService {
     private static AuditService instance;
     private static final String FISIER_AUDIT = "audit.csv";
@@ -27,12 +25,11 @@ public class AuditService {
         if (numeActiune == null || numeActiune.trim().isEmpty()) {
             return;
         }
-        // append = true -> nu suprascriem istoricul
         try (FileWriter writer = new FileWriter(FISIER_AUDIT, true)) {
             String timestamp = formatData.format(new Date());
             writer.write(numeActiune + "," + timestamp + "\n");
         } catch (IOException e) {
-            System.out.println("Eroare la scrierea in fisierul de audit: " + e.getMessage());
+            System.out.println("nu am putut scrie in fisierul de audit: " + e.getMessage());
         }
     }
 }

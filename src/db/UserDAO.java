@@ -84,7 +84,7 @@ public class UserDAO extends AbstractDAO<User> {
                 }
             }
         } catch (SQLException e) {
-            System.out.println("Eroare la readByEmail in utilizator: " + e.getMessage());
+            System.out.println("nu am putut cauta userul dupa email: " + e.getMessage());
         }
         return null;
     }

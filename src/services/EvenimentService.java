@@ -90,7 +90,7 @@ public class EvenimentService {
             return;
         }
 
-        // Persistam intai locatia, ca sa avem un id valid pentru FK
+        // salvam locatia intai, ca sa avem id pt FK
         if (eveniment.getLocatie() != null) {
             if (eveniment.getLocatie().getId() <= 0) {
                 this.locatieDAO.create(eveniment.getLocatie());
@@ -133,7 +133,7 @@ public class EvenimentService {
             Date currentDate = new Date();
             Date eventDate = eveniment.getData();
 
-            // Calculam diferenta in milisecunde si convertim la zile
+            // diferenta in zile
             long diffInMillies = eventDate.getTime() - currentDate.getTime();
             long diffInDays = diffInMillies / (24 * 60 * 60 * 1000);
 
@@ -316,8 +316,7 @@ public class EvenimentService {
             bilet.setValid(false);
             this.biletDAO.delete(biletId);
 
-            // Comanda devine REFUNDATA doar daca nu mai are niciun bilet valid;
-            // altfel ramane FINALIZATA (refund partial dintr-o comanda cu mai multe bilete)
+            // REFUNDATA doar daca nu mai are bilete valide, altfel ramane FINALIZATA
             if (comanda != null) {
                 long bileteRamase = this.biletDAO.readAll().stream()
                         .filter(b -> b.getComanda() != null && b.getComanda().getId() == comanda.getId() && b.isValid())
@@ -793,8 +792,6 @@ public class EvenimentService {
         }
 
         try {
-            // Salvam in folderul "exports" (montat ca volum in docker-compose),
-            // ca biletele exportate sa ramana pe disc dupa oprirea containerului.
             java.io.File folder = new java.io.File("exports");
             if (!folder.exists()) {
                 folder.mkdirs();

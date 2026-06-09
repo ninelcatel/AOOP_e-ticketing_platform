@@ -7,11 +7,6 @@ import java.sql.Statement;
 import java.util.ArrayList;
 import java.util.List;
 
-// Serviciu generic de scriere/citire din baza de date.
-// Fiecare DAO concret extinde aceasta clasa si furnizeaza:
-//  - numele tabelei
-//  - cum se mapeaza un rand din ResultSet intr-un obiect
-//  - SQL-ul de insert/update si parametrii corespunzatori
 public abstract class AbstractDAO<T> implements GenericDAO<T> {
 
     protected Connection getConnection() {
@@ -44,7 +39,7 @@ public abstract class AbstractDAO<T> implements GenericDAO<T> {
                 }
             }
         } catch (SQLException e) {
-            System.out.println("Eroare la create in " + getNumeTabela() + ": " + e.getMessage());
+            System.out.println("Nu am putut salva in " + getNumeTabela() + ": " + e.getMessage());
         }
         return -1;
     }
@@ -60,7 +55,7 @@ public abstract class AbstractDAO<T> implements GenericDAO<T> {
                 }
             }
         } catch (SQLException e) {
-            System.out.println("Eroare la read in " + getNumeTabela() + ": " + e.getMessage());
+            System.out.println("Nu am putut citi din " + getNumeTabela() + ": " + e.getMessage());
         }
         return null;
     }
@@ -75,7 +70,7 @@ public abstract class AbstractDAO<T> implements GenericDAO<T> {
                 rezultate.add(mapeazaRand(rs));
             }
         } catch (SQLException e) {
-            System.out.println("Eroare la readAll in " + getNumeTabela() + ": " + e.getMessage());
+            System.out.println("Nu am putut citi tot din " + getNumeTabela() + ": " + e.getMessage());
         }
         return rezultate;
     }
@@ -90,7 +85,7 @@ public abstract class AbstractDAO<T> implements GenericDAO<T> {
             seteazaParametriUpdate(ps, obiect);
             ps.executeUpdate();
         } catch (SQLException e) {
-            System.out.println("Eroare la update in " + getNumeTabela() + ": " + e.getMessage());
+            System.out.println("Nu am putut actualiza in " + getNumeTabela() + ": " + e.getMessage());
         }
     }
 
@@ -101,7 +96,7 @@ public abstract class AbstractDAO<T> implements GenericDAO<T> {
             ps.setInt(1, id);
             ps.executeUpdate();
         } catch (SQLException e) {
-            System.out.println("Eroare la delete in " + getNumeTabela() + ": " + e.getMessage());
+            System.out.println("Nu am putut sterge din " + getNumeTabela() + ": " + e.getMessage());
         }
     }
 }

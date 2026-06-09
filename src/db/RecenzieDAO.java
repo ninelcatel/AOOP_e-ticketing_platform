@@ -93,7 +93,7 @@ public class RecenzieDAO extends AbstractDAO<Recenzie> {
                 }
             }
         } catch (SQLException e) {
-            System.out.println("Eroare la readByEveniment in recenzie: " + e.getMessage());
+            System.out.println("Nu am putut citi recenziile evenimentului: " + e.getMessage());
         }
         return rezultate;
     }

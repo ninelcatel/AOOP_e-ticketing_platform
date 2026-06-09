@@ -1,7 +1,7 @@
 package db;
 import java.util.List;
 
-// Contractul generic CRUD pe care il expun toate DAO-urile.
+// CRUD comun pentru DAO.
 public interface GenericDAO<T> {
     int create(T obiect);
     T read(int id);

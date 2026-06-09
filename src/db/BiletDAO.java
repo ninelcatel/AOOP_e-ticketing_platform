@@ -99,7 +99,7 @@ public class BiletDAO extends AbstractDAO<Bilet> {
                 }
             }
         } catch (SQLException e) {
-            System.out.println("Eroare la readByUser in bilet: " + e.getMessage());
+            System.out.println("Nu am putut citi biletele userului: " + e.getMessage());
         }
         return rezultate;
     }
@@ -116,7 +116,7 @@ public class BiletDAO extends AbstractDAO<Bilet> {
                 }
             }
         } catch (SQLException e) {
-            System.out.println("Eroare la readByEveniment in bilet: " + e.getMessage());
+            System.out.println("Nu am putut citi biletele evenimentului: " + e.getMessage());
         }
         return rezultate;
     }

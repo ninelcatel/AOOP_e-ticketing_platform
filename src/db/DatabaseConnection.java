@@ -12,8 +12,7 @@ public class DatabaseConnection {
     private String pass;
 
     private DatabaseConnection() {
-        // Citim configurarea din environment (vezi docker-compose.yml).
-        // Daca nu exista, folosim valori default pentru rulare locala.
+        // config din environment,  valori default ca fallback
         this.url = getEnvOrDefault("DB_URL", "jdbc:mysql://localhost:3306/paoj_db");
         this.user = getEnvOrDefault("DB_USER", "root");
         this.pass = getEnvOrDefault("DB_PASS", "ninel4");
@@ -32,7 +31,7 @@ public class DatabaseConnection {
                 this.connection = DriverManager.getConnection(this.url, this.user, this.pass);
             }
         } catch (SQLException e) {
-            System.out.println("Eroare la conectarea cu baza de date: " + e.getMessage());
+            System.out.println("nu m am putut conecta la baza de date: " + e.getMessage());
             throw new RuntimeException(e);
         }
         return this.connection;
@@ -44,10 +43,10 @@ public class DatabaseConnection {
                 this.connection.close();
             }
         } catch (SQLException e) {
-            System.out.println("Eroare la inchiderea conexiunii: " + e.getMessage());
+            System.out.println("Nu am putut inchide conexiunea: " + e.getMessage());
         }
     }
-
+    
     private String getEnvOrDefault(String key, String valoareDefault) {
         String valoare = System.getenv(key);
         return valoare != null && !valoare.trim().isEmpty() ? valoare : valoareDefault;

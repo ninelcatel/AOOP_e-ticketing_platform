@@ -2,8 +2,6 @@ package db;
 import models.*;
 import java.util.Date;
 
-// Populeaza baza de date cu date initiale, dar DOAR daca este goala
-// (nu exista niciun utilizator). Astfel nu se dubleaza datele la fiecare pornire.
 public class DatabaseSeeder {
 
     public static void seed() {
@@ -11,19 +9,17 @@ public class DatabaseSeeder {
         LocatieDAO locatieDAO = LocatieDAO.getInstance();
         EvenimentDAO evenimentDAO = EvenimentDAO.getInstance();
 
-        // Daca exista deja utilizatori, presupunem ca DB-ul a fost populat.
+        // daca exista useri, presupunem ca e deja populat
         if (!userDAO.readAll().isEmpty()) {
             return;
         }
-
-        System.out.println("Baza de date este goala. Adaugam date initiale (seed)...");
 
         // --- Utilizator de test ---
         User user = new User(0, "Test User", "test@test.ro", "test");
         user.setBalanta(1000.0);
         userDAO.create(user);
 
-        // Date pentru evenimente (peste 60 de zile, ca sa permita si Early Bird)
+        // peste 60 de zile, ca sa mearga si Early Bird
         Date dataViitoare = new Date(System.currentTimeMillis() + 60L * 24 * 60 * 60 * 1000);
 
         // --- Concert ---
@@ -50,6 +46,5 @@ public class DatabaseSeeder {
         Museum muzeu = new Museum(0, "Expozitie Brancusi", dataViitoare, locMuzeu, 40.0, "Muzeul National de Arta", "Sculptura");
         evenimentDAO.create(muzeu);
 
-        System.out.println("Seed finalizat: 1 utilizator (test@test.ro / test) si 4 evenimente.");
     }
 }

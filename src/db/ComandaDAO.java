@@ -82,7 +82,7 @@ public class ComandaDAO extends AbstractDAO<Comanda> {
                 }
             }
         } catch (SQLException e) {
-            System.out.println("Eroare la readByUser in comanda: " + e.getMessage());
+            System.out.println("Nu am putut citi comenzile userului: " + e.getMessage());
         }
         return rezultate;
     }

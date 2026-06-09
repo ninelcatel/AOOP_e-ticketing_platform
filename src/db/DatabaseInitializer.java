@@ -3,8 +3,7 @@ import java.sql.Connection;
 import java.sql.SQLException;
 import java.sql.Statement;
 
-// Creeaza automat tabelele la pornire (daca nu exista deja).
-// Astfel aplicatia se conecteaza si retine datele fara SQL manual.
+// Creeaza tabelele la pornire daca nu exista.
 public class DatabaseInitializer {
 
     public static void initializeaza() {
@@ -106,9 +105,8 @@ public class DatabaseInitializer {
                 ")"
             );
 
-            System.out.println("Baza de date a fost initializata cu succes.");
         } catch (SQLException e) {
-            System.out.println("Eroare la initializarea bazei de date: " + e.getMessage());
+            System.out.println("nu am putut initializa baza de date: " + e.getMessage());
             throw new RuntimeException(e);
         }
     }
